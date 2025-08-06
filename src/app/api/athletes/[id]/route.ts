@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:1440/api';
 
 export async function GET(
-    request: NextRequest,
+    request: Request, // It's conventional to use the standard Request type
     { params }: { params: { id: string } }
 ) {
     try {
@@ -63,10 +63,13 @@ export async function DELETE(
 
         const response = await fetch(backendUrl, {
             method: 'DELETE',
-            headers: {
-                'Content-Type': 'application/json',
-            },
         });
+
+        // DELETE requests often return no body, or a non-JSON body on success.
+        // It's safer to check the status and return a specific success message.
+        if (response.ok) {
+            return NextResponse.json({ message: 'Delete successful' }, { status: response.status });
+        }
 
         const data = await response.json();
         return NextResponse.json(data, { status: response.status });
@@ -74,4 +77,4 @@ export async function DELETE(
         console.error('Error proxying DELETE request:', error);
         return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
     }
-} 
+}
