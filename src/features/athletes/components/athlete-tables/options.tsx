@@ -1,0 +1,22 @@
+export const DISCIPLINE_MAP = {
+  '100M': '100 Meters',
+  '200M': '200 Meters',
+  '400M': '400 Meters',
+  '800M': '800 Meters',
+  '1500M': '1500 Meters',
+  '110H': '110m Hurdles',
+  LJ: 'Long Jump',
+  HJ: 'High Jump',
+  SP: 'Shot Put',
+  JAV: 'Javelin',
+  '57KG_FS': '57kg Freestyle',
+  '61KG_FS': '61kg Freestyle',
+  '65KG_FS': '65kg Freestyle',
+  '70KG_FS': '70kg Freestyle',
+  '74KG_FS': '74kg Freestyle',
+  FLY: 'Flyweight',
+  BAN: 'Bantamweight',
+  FEA: 'Featherweight',
+  LIG: 'Lightweight',
+  WEL: 'Welterweight'
+} as const;
