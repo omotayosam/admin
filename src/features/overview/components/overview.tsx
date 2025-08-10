@@ -12,7 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AreaGraph } from './area-graph';
 import { BarGraph } from './bar-graph';
 import { PieGraph } from './pie-graph';
-import { RecentSales } from './recent-athletes';
+import RecentAthletes from './recent-athletes';
 import { IconTrendingUp, IconTrendingDown } from '@tabler/icons-react';
 import { Badge } from '@/components/ui/badge';
 
@@ -131,9 +131,9 @@ export default function OverViewPage() {
               <div className='col-span-4'>
                 <BarGraph />
               </div>
-              <Card className='col-span-4 md:col-span-3'>
-                <RecentSales />
-              </Card>
+              <div className='col-span-4 md:col-span-3'>
+                <RecentAthletes />
+              </div>
               <div className='col-span-4'>
                 <AreaGraph />
               </div>
