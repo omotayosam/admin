@@ -7,58 +7,46 @@ import { useDataTable } from '@/hooks/use-data-table';
 
 import { ColumnDef } from '@tanstack/react-table';
 import { parseAsInteger, useQueryState } from 'nuqs';
+
 import { Button } from '@/components/ui/button';
 import { Plus } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
-import { TeamDialog } from '../team-dialog';
-import { teamService } from '../../service/team.service';
+import { EventDialog, type EventFormData } from '../event-dialog';
 import { useRouter } from 'next/navigation';
 
-interface TeamTableParams<TData, TValue> {
+interface EventTableParams<TData, TValue> {
   data: TData[];
   totalItems: number;
   columns: ColumnDef<TData, TValue>[];
 }
 
-// Match TeamDialog form shape
-type TeamFormShape = { code: string; name: string; sportId: string };
-
-export function TeamTable<TData, TValue>({
+export function EventTable<TData, TValue>({
   data,
   totalItems,
   columns
-}: TeamTableParams<TData, TValue>) {
+}: EventTableParams<TData, TValue>) {
   const [pageSize] = useQueryState('perPage', parseAsInteger.withDefault(10));
 
   const pageCount = Math.ceil(totalItems / pageSize);
-  const [isTeamDialogOpen, setIsTeamDialogOpen] = useState(false);
-  const [selectedTeam, setSelectedTeam] = useState<TeamFormShape | null>(null);
+  const [isEventDialogOpen, setIsEventDialogOpen] = useState(false);
+  const [selectedEvent, setSelectedEvent] = useState<EventFormData | null>(
+    null
+  );
   const router = useRouter();
-
   const { table } = useDataTable({
-    data, // Team data
-    columns, // Team columns
+    data, // Event data
+    columns, // Event columns
     pageCount: pageCount,
     shallow: false, //Setting to false triggers a network request with the updated querystring.
     debounceMs: 500
   });
 
-  const handleTeamSave = async (team: TeamFormShape) => {
-    try {
-      await teamService.createTeam({
-        code: team.code,
-        name: team.name,
-        sportId: Number(team.sportId)
-      });
-      toast.success(`Team "${team.name}" added`);
-      setIsTeamDialogOpen(false);
-      setSelectedTeam(null);
-      router.refresh();
-    } catch (e) {
-      console.error('Failed to create team', e);
-      toast.error('Failed to create team');
-    }
+  const handleEventSaved = () => {
+    toast('Event saved', { position: 'bottom-left' });
+    router.refresh();
+    setIsEventDialogOpen(false);
+    setSelectedEvent(null);
   };
 
   return (
@@ -67,21 +55,21 @@ export function TeamTable<TData, TValue>({
         variant='outline'
         className='max-sm:h-8 max-sm:px-2.5!'
         onClick={() => {
-          setSelectedTeam(null);
-          setIsTeamDialogOpen(true);
+          setSelectedEvent(null);
+          setIsEventDialogOpen(true);
         }}
       >
         <Plus className='mr-2 h-4 w-4' />
-        New Team
+        New Event
       </Button>
-      <TeamDialog
-        team={selectedTeam}
-        isOpen={isTeamDialogOpen}
+      <EventDialog
+        eventData={selectedEvent}
+        isOpen={isEventDialogOpen}
         onClose={() => {
-          setIsTeamDialogOpen(false);
-          setSelectedTeam(null);
+          setIsEventDialogOpen(false);
+          setSelectedEvent(null);
         }}
-        onSave={handleTeamSave}
+        onSaved={handleEventSaved}
       />
       <DataTableToolbar table={table} />
     </DataTable>

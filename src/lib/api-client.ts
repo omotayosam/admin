@@ -3,14 +3,20 @@ import axios from 'axios';
 // Create an axios instance with default config
 const isServer = typeof window === 'undefined';
 
+const resolvedBaseUrl =
+    process.env.NEXT_PUBLIC_API_URL && process.env.NEXT_PUBLIC_API_URL.trim().length > 0
+        ? process.env.NEXT_PUBLIC_API_URL
+        : isServer
+            ? 'http://localhost:1440/api'
+            : '/api';
+
 const apiClient = axios.create({
-    baseURL: isServer
-        ? process.env.NEXT_PUBLIC_API_URL || 'http://localhost:1440/api'
-        : '/api',
+    baseURL: resolvedBaseUrl,
     headers: {
         'Content-Type': 'application/json',
     },
-    withCredentials: true,
+    // Send cookies only for same-origin proxy usage (development rewrites)
+    withCredentials: typeof window !== 'undefined' ? resolvedBaseUrl.startsWith('/') : false,
 });
 
 // Log the configuration

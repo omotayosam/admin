@@ -9,8 +9,9 @@ import { Input } from '@/components/ui/input';
 import { Trophy, Calendar, Target } from 'lucide-react';
 import apiClient from '@/lib/api-client';
 import SimpleLayout from '../simple-layout';
+import { performanceService } from '@/features/performances/service/performance.service';
 
-interface Performance {
+interface PerformanceItemVM {
   id: string;
   athleteName: string;
   eventName: string;
@@ -23,30 +24,108 @@ interface Performance {
 }
 
 export default function PerformancesPage() {
-  const [performances, setPerformances] = useState<Performance[]>([]);
+  const [performances, setPerformances] = useState<PerformanceItemVM[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
     fetchPerformances();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const fetchPerformances = async () => {
-    try {
-      setLoading(true);
-      // For now, we'll show a placeholder since we need to implement this endpoint
-      // const response = await apiClient.get('/performances');
-      // setPerformances(response.data);
-      setPerformances([]);
-    } catch (error) {
-      console.error('Error fetching performances:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  useEffect(() => {
+    const handle = setTimeout(() => {
+      fetchPerformances(searchTerm);
+    }, 300);
+    return () => clearTimeout(handle);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchTerm]);
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString();
+  };
+
+  const formatResult = (p: any): string => {
+    if (p?.time !== undefined && p.time !== null) return `${p.time}s`;
+    if (p?.distance !== undefined && p.distance !== null)
+      return `${p.distance}m`;
+    if (p?.height !== undefined && p.height !== null) return `${p.height}m`;
+    if (p?.points !== undefined && p.points !== null) return `${p.points} pts`;
+    // Basketball specific summary
+    if (
+      [
+        'twoPoints',
+        'threePoints',
+        'freeThrows',
+        'rebounds',
+        'assists',
+        'steals',
+        'blocks'
+      ].some((k) => p?.[k] !== undefined && p?.[k] !== null)
+    ) {
+      const parts: string[] = [];
+      if (p.points != null) parts.push(`${p.points} PTS`);
+      if (p.rebounds != null) parts.push(`${p.rebounds} REB`);
+      if (p.assists != null) parts.push(`${p.assists} AST`);
+      return parts.join(' · ') || '—';
+    }
+    // Football summary
+    if (
+      [
+        'goalsScored',
+        'assists',
+        'minutesPlayed',
+        'yellowCards',
+        'redCards'
+      ].some((k) => p?.[k] !== undefined && p?.[k] !== null)
+    ) {
+      const parts: string[] = [];
+      if (p.goalsScored != null) parts.push(`${p.goalsScored} G`);
+      if (p.assists != null) parts.push(`${p.assists} A`);
+      if (p.minutesPlayed != null) parts.push(`${p.minutesPlayed}'`);
+      return parts.join(' · ') || '—';
+    }
+    return '—';
+  };
+
+  const fetchPerformances = async (search?: string) => {
+    try {
+      setLoading(true);
+      const response = await performanceService.getAllPerformances({
+        ...(search ? { search } : {}),
+        limit: '10',
+        page: '1'
+      });
+
+      const items = (response?.data || []).map((p: any) => {
+        const athleteName = p?.athlete
+          ? `${p.athlete.firstName} ${p.athlete.lastName}`
+          : 'Unknown Athlete';
+        const eventName = p?.event?.name ?? 'Unknown Event';
+        const disciplineName =
+          p?.discipline?.name ??
+          (p?.event?.sport?.isTeamSport ? p?.event?.sport?.name : '—');
+        const venueName = p?.event?.venue?.name ?? undefined;
+        return {
+          id: String(p.performanceId ?? p.id ?? Math.random()),
+          athleteName,
+          eventName,
+          discipline: disciplineName,
+          result: formatResult(p),
+          date: p?.date ?? p?.event?.startDate ?? new Date().toISOString(),
+          venue: venueName,
+          rank: p?.position ?? undefined,
+          isPersonalBest: p?.isPersonalBest ?? false
+        } as PerformanceItemVM;
+      });
+
+      setPerformances(items);
+    } catch (error) {
+      console.error('Error fetching performances:', error);
+      setPerformances([]);
+    } finally {
+      setLoading(false);
+    }
   };
 
   if (loading) {

@@ -154,6 +154,14 @@ export const navItems: NavItem[] = [
     isActive: false,
     items: [] // No child items
   },
+  {
+    title: 'Events',
+    url: '/dashboard/events',
+    icon: 'product',
+    shortcut: ['s', 's'],
+    isActive: false,
+    items: [] // No child items
+  },
 
 ];
 

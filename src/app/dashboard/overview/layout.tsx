@@ -10,8 +10,10 @@ import {
 } from '@/components/ui/card';
 import { IconTrendingDown, IconTrendingUp } from '@tabler/icons-react';
 import React from 'react';
+import { athleteService } from '@/features/athletes/service/athlete.service';
+import { eventService } from '@/features/events/service/event.service';
 
-export default function OverViewLayout({
+export default async function OverViewLayout({
   sales,
   pie_stats,
   bar_stats
@@ -21,6 +23,35 @@ export default function OverViewLayout({
   bar_stats: React.ReactNode;
   area_stats: React.ReactNode;
 }) {
+  // Fetch totals server-side
+  let totalAthletes = 0;
+  let totalEvents = 0;
+
+  try {
+    const athletesRes = await athleteService.getAllAthletes({
+      page: '1',
+      limit: '1'
+    });
+    totalAthletes =
+      (athletesRes as any)?.total ??
+      (Array.isArray(athletesRes?.data) ? athletesRes.data.length : 0);
+  } catch (e) {
+    totalAthletes = 0;
+  }
+
+  try {
+    const eventsRes = await eventService.getAll({});
+    const payload: any = eventsRes as any;
+    const eventsArray = Array.isArray(payload?.data)
+      ? payload.data
+      : Array.isArray(payload?.data?.data)
+        ? payload.data.data
+        : [];
+    totalEvents = eventsArray.length;
+  } catch (e) {
+    totalEvents = 0;
+  }
+
   return (
     <PageContainer>
       <div className='flex flex-1 flex-col space-y-2'>
@@ -35,7 +66,7 @@ export default function OverViewLayout({
             <CardHeader>
               <CardDescription>Total Athletes</CardDescription>
               <CardTitle className='text-2xl font-semibold tabular-nums @[250px]/card:text-3xl'>
-                100
+                {totalAthletes.toLocaleString()}
               </CardTitle>
               <CardAction>
                 <Badge variant='outline'>
@@ -54,7 +85,7 @@ export default function OverViewLayout({
               </div>
             </CardFooter>
           </Card>
-          <Card className='@container/card'>
+          {/* <Card className='@container/card'>
             <CardHeader>
               <CardDescription>Pending Registration</CardDescription>
               <CardTitle className='text-2xl font-semibold tabular-nums @[250px]/card:text-3xl'>
@@ -75,12 +106,12 @@ export default function OverViewLayout({
                 Approval needs attention
               </div>
             </CardFooter>
-          </Card>
+          </Card> */}
           <Card className='@container/card'>
             <CardHeader>
               <CardDescription>Total Events</CardDescription>
               <CardTitle className='text-2xl font-semibold tabular-nums @[250px]/card:text-3xl'>
-                678
+                {totalEvents.toLocaleString()}
               </CardTitle>
               <CardAction>
                 <Badge variant='outline'>

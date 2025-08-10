@@ -24,6 +24,9 @@ import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { athleteService } from '../service/athlete.service';
 import { useRouter } from 'next/navigation';
+import { teamService } from '@/features/teams/service/team.service';
+import { positionService } from '@/features/positions/service/position.service';
+import type { Team } from '@/constants/data';
 
 export interface AthleteFormData {
   athleteId?: number;
@@ -53,6 +56,27 @@ interface AthleteDialogProps {
   onDelete: (athleteId: number) => void;
 }
 
+function generateAthleteCode(prefix: string = 'ATH'): string {
+  const random = Math.floor(10000000 + Math.random() * 90000000); // 8 digits
+  return `${prefix}${random}`;
+}
+
+function sportPrefix(sportType: AthleteFormData['sportType']): string {
+  switch (sportType) {
+    case 'FOOTBALL':
+      return 'FB';
+    case 'BASKETBALL':
+      return 'BB';
+    case 'WRESTLING':
+      return 'WR';
+    case 'BOXING':
+      return 'BX';
+    case 'ATHLETICS':
+    default:
+      return 'ATH';
+  }
+}
+
 export function AthleteDialog({
   athlete,
   isOpen,
@@ -63,7 +87,7 @@ export function AthleteDialog({
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState<AthleteFormData>({
-    code: '',
+    code: generateAthleteCode('ATH'),
     firstName: '',
     lastName: '',
     dateOfBirth: '',
@@ -77,8 +101,16 @@ export function AthleteDialog({
     disciplines: []
   });
 
+  // Team search state
+  const [teamQuery, setTeamQuery] = useState('');
+  const [teamOptions, setTeamOptions] = useState<Team[]>([]);
+  const [positions, setPositions] = useState<
+    { positionId: number; code: string; name: string; sportId: number }[]
+  >([]);
+  const isTeamSport =
+    formData.sportType === 'FOOTBALL' || formData.sportType === 'BASKETBALL';
+
   useEffect(() => {
-    console.log('AthleteDialog received athlete:', athlete);
     if (athlete) {
       setFormData({
         athleteId: athlete.athleteId,
@@ -99,7 +131,7 @@ export function AthleteDialog({
       });
     } else {
       setFormData({
-        code: '',
+        code: generateAthleteCode(sportPrefix('ATHLETICS')),
         firstName: '',
         lastName: '',
         dateOfBirth: '',
@@ -115,17 +147,65 @@ export function AthleteDialog({
     }
   }, [athlete]);
 
+  // When sport type changes, optionally regenerate a code prefix for new athletes
+  useEffect(() => {
+    if (!athlete) {
+      const prefix = sportPrefix(formData.sportType);
+      setFormData((prev) => ({ ...prev, code: generateAthleteCode(prefix) }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formData.sportType]);
+
+  // Fetch positions whenever team or sport changes for team sports
+  useEffect(() => {
+    const loadPositions = async () => {
+      try {
+        setPositions([]);
+        if (!isTeamSport) return;
+        const selectedTeam = teamOptions.find(
+          (t) => t.code === formData.teamCode
+        );
+        const sportId = selectedTeam?.sportId;
+        if (!sportId) return;
+        const list = await positionService.getPositionsBySport(sportId);
+        setPositions(list);
+      } catch (e) {
+        console.error('Failed to load positions', e);
+      }
+    };
+    loadPositions();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formData.teamCode, formData.sportType]);
+
+  // Debounced team search
+  useEffect(() => {
+    const handle = setTimeout(async () => {
+      try {
+        if (!isTeamSport) return;
+        const page = await teamService.getAllTeams({
+          search: teamQuery,
+          limit: '10',
+          page: '1'
+        });
+        setTeamOptions(page.data || []);
+      } catch (e) {
+        console.error('Failed to search teams', e);
+        setTeamOptions([]);
+      }
+    }, 300);
+    return () => clearTimeout(handle);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [teamQuery, formData.sportType]);
+
   const handleSave = async () => {
     try {
       setLoading(true);
 
-      // Basic validation
       if (!formData.firstName || !formData.lastName || !formData.code) {
         toast.error('Please fill in all required fields');
         return;
       }
 
-      // Create athlete data object
       const athleteData = {
         code: formData.code,
         firstName: formData.firstName,
@@ -135,61 +215,97 @@ export function AthleteDialog({
         gender: formData.gender as 'MALE' | 'FEMALE' | 'OTHER',
         height: formData.height || 0,
         weight: formData.weight || 0,
-        bio: formData.bio || '',
-        isActive: formData.isActive !== undefined ? formData.isActive : true,
-        sportType: formData.sportType as
-          | 'BASKETBALL'
-          | 'FOOTBALL'
-          | 'ATHLETICS'
-          | 'WRESTLING'
-          | 'BOXING'
+        bio: formData.bio || ''
       };
 
       let response;
 
       if (athlete?.athleteId) {
-        // Update existing athlete
+        // Build update payload (omit sportType; include teamCode/positionId if provided)
+        const updatePayload: any = { ...athleteData };
+        if (isTeamSport) {
+          if (formData.teamCode) updatePayload.teamCode = formData.teamCode;
+          if (formData.positionCode) {
+            const pos = positions.find((p) => p.code === formData.positionCode);
+            if (pos) updatePayload.positionId = pos.positionId;
+          }
+        }
         response = await athleteService.updateAthlete(
           athlete.athleteId,
-          athleteData
+          updatePayload
         );
         toast.success(
           `Athlete "${formData.firstName} ${formData.lastName}" updated successfully`
         );
       } else {
-        // Create new athlete - determine if individual or team
-        if (
-          formData.sportType === 'FOOTBALL' ||
-          formData.sportType === 'BASKETBALL'
-        ) {
-          // Team athlete
-          if (formData.teamCode && formData.positionCode) {
-            response = await athleteService.createTeamAthlete({
-              ...athleteData,
-              teamCode: formData.teamCode,
-              positionCode: formData.positionCode
-            });
-          } else {
-            toast.error(
-              'Team code and position code are required for team athletes'
-            );
-            return;
+        // Helper to attempt create and retry on duplicate code
+        const attemptCreate = async (): Promise<any> => {
+          try {
+            if (isTeamSport) {
+              if (formData.teamCode && formData.positionCode) {
+                return await athleteService.createTeamAthlete({
+                  ...athleteData,
+                  sportType: formData.sportType,
+                  teamCode: formData.teamCode!,
+                  positionCode: formData.positionCode!
+                });
+              }
+              throw new Error(
+                'Please select a team and position for team athletes'
+              );
+            } else {
+              if (formData.disciplines && formData.disciplines.length > 0) {
+                return await athleteService.createIndividualAthlete({
+                  ...athleteData,
+                  sportType: formData.sportType,
+                  disciplines: formData.disciplines
+                });
+              } else {
+                return await athleteService.createIndividualAthlete({
+                  ...athleteData,
+                  sportType: formData.sportType,
+                  disciplines: [{ code: '100M', currentRank: 1 }]
+                });
+              }
+            }
+          } catch (err: any) {
+            const status = err?.response?.status;
+            if (status === 409) {
+              // Duplicate code - generate a new one and retry once
+              const prefix = sportPrefix(formData.sportType);
+              const newCode = generateAthleteCode(prefix);
+              setFormData((prev) => ({ ...prev, code: newCode }));
+              return await new Promise((resolve, reject) => {
+                setTimeout(async () => {
+                  try {
+                    const retry = await (isTeamSport
+                      ? athleteService.createTeamAthlete({
+                          ...athleteData,
+                          code: newCode,
+                          sportType: formData.sportType,
+                          teamCode: formData.teamCode!,
+                          positionCode: formData.positionCode!
+                        })
+                      : athleteService.createIndividualAthlete({
+                          ...athleteData,
+                          code: newCode,
+                          sportType: formData.sportType,
+                          disciplines: formData.disciplines?.length
+                            ? formData.disciplines
+                            : [{ code: '100M', currentRank: 1 }]
+                        }));
+                    resolve(retry);
+                  } catch (e) {
+                    reject(e);
+                  }
+                }, 150);
+              });
+            }
+            throw err;
           }
-        } else {
-          // Individual athlete
-          if (formData.disciplines && formData.disciplines.length > 0) {
-            response = await athleteService.createIndividualAthlete({
-              ...athleteData,
-              disciplines: formData.disciplines
-            });
-          } else {
-            // Default to individual athlete with a basic discipline
-            response = await athleteService.createIndividualAthlete({
-              ...athleteData,
-              disciplines: [{ code: '100M', currentRank: 1 }]
-            });
-          }
-        }
+        };
+
+        response = await attemptCreate();
         toast.success(
           `Athlete "${formData.firstName} ${formData.lastName}" created successfully`
         );
@@ -197,7 +313,7 @@ export function AthleteDialog({
 
       onSave(formData);
       onClose();
-      router.refresh(); // Refresh the page to show updated data
+      router.refresh();
     } catch (error) {
       console.error('Error saving athlete:', error);
       toast.error('Failed to save athlete');
@@ -217,7 +333,7 @@ export function AthleteDialog({
       await athleteService.deleteAthlete(athlete.athleteId);
       onDelete(athlete.athleteId);
       onClose();
-      router.refresh(); // Refresh the page to show updated data
+      router.refresh();
       toast.success('Athlete deleted successfully');
     } catch (error) {
       console.error('Error deleting athlete:', error);
@@ -245,14 +361,28 @@ export function AthleteDialog({
           <div className='grid grid-cols-2 gap-4'>
             <div className='space-y-2'>
               <Label htmlFor='code'>Code *</Label>
-              <Input
-                id='code'
-                value={formData.code}
-                onChange={(e) =>
-                  setFormData({ ...formData, code: e.target.value })
-                }
-                placeholder='ATH001'
-              />
+              <div className='flex gap-2'>
+                <Input
+                  id='code'
+                  value={formData.code}
+                  onChange={(e) =>
+                    setFormData({ ...formData, code: e.target.value })
+                  }
+                  placeholder='ATH00123456'
+                />
+                <Button
+                  type='button'
+                  variant='outline'
+                  onClick={() =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      code: generateAthleteCode(sportPrefix(formData.sportType))
+                    }))
+                  }
+                >
+                  Randomize
+                </Button>
+              </div>
             </div>
             <div className='space-y-2'>
               <Label htmlFor='sportType'>Sport Type *</Label>
@@ -265,7 +395,17 @@ export function AthleteDialog({
                     | 'ATHLETICS'
                     | 'WRESTLING'
                     | 'BOXING'
-                ) => setFormData({ ...formData, sportType: value })}
+                ) => {
+                  setFormData({
+                    ...formData,
+                    sportType: value,
+                    teamCode: undefined,
+                    positionCode: undefined
+                  });
+                  setTeamQuery('');
+                  setTeamOptions([]);
+                  setPositions([]);
+                }}
               >
                 <SelectTrigger>
                   <SelectValue placeholder='Select sport' />
@@ -396,89 +536,118 @@ export function AthleteDialog({
           </div>
 
           {/* Team fields for team sports */}
-          {(formData.sportType === 'FOOTBALL' ||
-            formData.sportType === 'BASKETBALL') && (
+          {isTeamSport && (
             <div className='grid grid-cols-2 gap-4'>
               <div className='space-y-2'>
-                <Label htmlFor='teamCode'>Team Code</Label>
+                <Label htmlFor='teamSearch'>School (Team)</Label>
                 <Input
-                  id='teamCode'
-                  value={formData.teamCode || ''}
-                  onChange={(e) =>
-                    setFormData({ ...formData, teamCode: e.target.value })
-                  }
-                  placeholder='TEAM001'
+                  id='teamSearch'
+                  value={teamQuery}
+                  onChange={(e) => setTeamQuery(e.target.value)}
+                  placeholder='Type school name to search'
                 />
+                {teamOptions.length > 0 && (
+                  <div className='max-h-48 overflow-auto rounded-md border'>
+                    {teamOptions.map((t) => (
+                      <div
+                        key={t.teamId}
+                        className={`hover:bg-accent cursor-pointer px-3 py-2 ${formData.teamCode === t.code ? 'bg-accent' : ''}`}
+                        onClick={() =>
+                          setFormData({ ...formData, teamCode: t.code })
+                        }
+                      >
+                        <div className='font-medium'>{t.name}</div>
+                        <div className='text-muted-foreground text-xs'>
+                          {t.code}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
               <div className='space-y-2'>
-                <Label htmlFor='positionCode'>Position Code</Label>
-                <Input
-                  id='positionCode'
+                <Label htmlFor='positionCode'>Position</Label>
+                <Select
                   value={formData.positionCode || ''}
-                  onChange={(e) =>
-                    setFormData({ ...formData, positionCode: e.target.value })
+                  onValueChange={(value) =>
+                    setFormData({ ...formData, positionCode: value })
                   }
-                  placeholder='POS001'
-                />
+                  disabled={!positions.length}
+                >
+                  <SelectTrigger>
+                    <SelectValue
+                      placeholder={
+                        positions.length
+                          ? 'Select position'
+                          : 'Select a team first'
+                      }
+                    />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {positions.map((p) => (
+                      <SelectItem key={p.positionId} value={p.code}>
+                        {p.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
           )}
 
           {/* Discipline selection for individual athletes */}
-          {formData.sportType &&
-            formData.sportType !== 'FOOTBALL' &&
-            formData.sportType !== 'BASKETBALL' && (
-              <div className='space-y-2'>
-                <Label htmlFor='disciplines'>Disciplines</Label>
-                <Select
-                  value={formData.disciplines?.[0]?.code || ''}
-                  onValueChange={(value) =>
-                    setFormData({
-                      ...formData,
-                      disciplines: [{ code: value, currentRank: 1 }]
-                    })
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder='Select discipline' />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {formData.sportType === 'ATHLETICS' && (
-                      <>
-                        <SelectItem value='100M'>100 Meters</SelectItem>
-                        <SelectItem value='200M'>200 Meters</SelectItem>
-                        <SelectItem value='400M'>400 Meters</SelectItem>
-                        <SelectItem value='800M'>800 Meters</SelectItem>
-                        <SelectItem value='1500M'>1500 Meters</SelectItem>
-                        <SelectItem value='110H'>110m Hurdles</SelectItem>
-                        <SelectItem value='LJ'>Long Jump</SelectItem>
-                        <SelectItem value='HJ'>High Jump</SelectItem>
-                        <SelectItem value='SP'>Shot Put</SelectItem>
-                        <SelectItem value='JAV'>Javelin</SelectItem>
-                      </>
-                    )}
-                    {formData.sportType === 'WRESTLING' && (
-                      <>
-                        <SelectItem value='57KG_FS'>57kg Freestyle</SelectItem>
-                        <SelectItem value='61KG_FS'>61kg Freestyle</SelectItem>
-                        <SelectItem value='65KG_FS'>65kg Freestyle</SelectItem>
-                        <SelectItem value='70KG_FS'>70kg Freestyle</SelectItem>
-                        <SelectItem value='74KG_FS'>74kg Freestyle</SelectItem>
-                      </>
-                    )}
-                    {formData.sportType === 'BOXING' && (
-                      <>
-                        <SelectItem value='FLY'>Flyweight</SelectItem>
-                        <SelectItem value='BAN'>Bantamweight</SelectItem>
-                        <SelectItem value='FEA'>Featherweight</SelectItem>
-                        <SelectItem value='LIG'>Lightweight</SelectItem>
-                        <SelectItem value='WEL'>Welterweight</SelectItem>
-                      </>
-                    )}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
+          {formData.sportType && !isTeamSport && (
+            <div className='space-y-2'>
+              <Label htmlFor='disciplines'>Disciplines</Label>
+              <Select
+                value={formData.disciplines?.[0]?.code || ''}
+                onValueChange={(value) =>
+                  setFormData({
+                    ...formData,
+                    disciplines: [{ code: value, currentRank: 1 }]
+                  })
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder='Select discipline' />
+                </SelectTrigger>
+                <SelectContent>
+                  {formData.sportType === 'ATHLETICS' && (
+                    <>
+                      <SelectItem value='100M'>100 Meters</SelectItem>
+                      <SelectItem value='200M'>200 Meters</SelectItem>
+                      <SelectItem value='400M'>400 Meters</SelectItem>
+                      <SelectItem value='800M'>800 Meters</SelectItem>
+                      <SelectItem value='1500M'>1500 Meters</SelectItem>
+                      <SelectItem value='110H'>110m Hurdles</SelectItem>
+                      <SelectItem value='LJ'>Long Jump</SelectItem>
+                      <SelectItem value='HJ'>High Jump</SelectItem>
+                      <SelectItem value='SP'>Shot Put</SelectItem>
+                      <SelectItem value='JAV'>Javelin</SelectItem>
+                    </>
+                  )}
+                  {formData.sportType === 'WRESTLING' && (
+                    <>
+                      <SelectItem value='57KG_FS'>57kg Freestyle</SelectItem>
+                      <SelectItem value='61KG_FS'>61kg Freestyle</SelectItem>
+                      <SelectItem value='65KG_FS'>65kg Freestyle</SelectItem>
+                      <SelectItem value='70KG_FS'>70kg Freestyle</SelectItem>
+                      <SelectItem value='74KG_FS'>74kg Freestyle</SelectItem>
+                    </>
+                  )}
+                  {formData.sportType === 'BOXING' && (
+                    <>
+                      <SelectItem value='FLY'>Flyweight</SelectItem>
+                      <SelectItem value='BAN'>Bantamweight</SelectItem>
+                      <SelectItem value='FEA'>Featherweight</SelectItem>
+                      <SelectItem value='LIG'>Lightweight</SelectItem>
+                      <SelectItem value='WEL'>Welterweight</SelectItem>
+                    </>
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           <div className='flex items-center space-x-2'>
             <Switch

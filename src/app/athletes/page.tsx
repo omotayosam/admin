@@ -9,40 +9,9 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Search } from 'lucide-react';
 import { Input } from '@/components/ui/input';
-import apiClient from '@/lib/api-client';
 import SimpleLayout from '../simple-layout';
-
-interface Athlete {
-  athleteId: number;
-  firstName: string;
-  lastName: string;
-  code: string;
-  dateOfBirth: string;
-  gender: string;
-  nationality: string;
-  height?: number;
-  weight?: number;
-  bio?: string;
-  isActive: boolean;
-  teamCode?: string;
-  positionId?: number;
-  team?: string;
-  position?: string;
-  avatarUrl?: string;
-  disciplines?: Array<{
-    id: number;
-    disciplineId: number;
-    currentRank: number;
-    discipline: {
-      disciplineId: number;
-      name: string;
-      code: string;
-      sportId: number;
-      description?: string;
-      unit: string;
-    };
-  }>;
-}
+import { athleteService } from '@/features/athletes/service/athlete.service';
+import type { Athlete } from '@/constants/data';
 
 export default function AthletesPage() {
   const router = useRouter();
@@ -54,19 +23,27 @@ export default function AthletesPage() {
     fetchAthletes();
   }, []);
 
-  const fetchAthletes = async () => {
+  useEffect(() => {
+    const handle = setTimeout(() => {
+      fetchAthletes(searchTerm);
+    }, 300);
+    return () => clearTimeout(handle);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchTerm]);
+
+  const fetchAthletes = async (search?: string) => {
     try {
       setLoading(true);
-      const response = await apiClient.get('/athletes');
-      console.log('API Response:', response.data);
-
-      // Handle paginated response structure
-      const athletesData = response.data?.data || [];
-      console.log('Processed athletes data:', athletesData);
+      const response = await athleteService.getAllAthletes({
+        page: '1',
+        limit: '100',
+        ...(search ? { search } : {})
+      });
+      const athletesData = response.data || [];
       setAthletes(athletesData);
     } catch (error) {
       console.error('Error fetching athletes:', error);
-      setAthletes([]); // Set empty array on error
+      setAthletes([]);
     } finally {
       setLoading(false);
     }
@@ -177,13 +154,13 @@ export default function AthletesPage() {
                   {athlete.team && (
                     <div className='flex justify-between'>
                       <span className='text-sm text-gray-600'>Team:</span>
-                      <span className='text-sm'>{athlete.team}</span>
+                      <span className='text-sm'>{athlete.team?.name}</span>
                     </div>
                   )}
                   {athlete.position && (
                     <div className='flex justify-between'>
                       <span className='text-sm text-gray-600'>Position:</span>
-                      <span className='text-sm'>{athlete.position}</span>
+                      <span className='text-sm'>{athlete.position?.name}</span>
                     </div>
                   )}
                   {athlete.disciplines && athlete.disciplines.length > 0 && (
@@ -193,7 +170,7 @@ export default function AthletesPage() {
                       </span>
                       <span className='text-sm'>
                         {athlete.disciplines
-                          .map((d) => d.discipline.name)
+                          .map((d) => d.discipline?.name)
                           .join(', ')}
                       </span>
                     </div>

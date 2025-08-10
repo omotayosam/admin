@@ -6,76 +6,98 @@ import {
   CardTitle,
   CardDescription
 } from '@/components/ui/card';
-import { description } from './bar-graph';
+import { athleteService } from '@/features/athletes/service/athlete.service';
+import { performanceService } from '@/features/performances/service/performance.service';
 
-const athletesData = [
-  {
-    name: 'Olivia Martin',
-    email: 'olivia.martin@email.com',
-    avatar: 'https://api.slingacademy.com/public/sample-users/1.png',
-    fallback: 'OM',
-    date: '21/02/2025',
-    description: 'Olivia registered for a boxing event'
-  },
-  {
-    name: 'Jackson Lee',
-    email: 'jackson.lee@email.com',
-    avatar: 'https://api.slingacademy.com/public/sample-users/2.png',
-    fallback: 'JL',
-    date: '21/02/2025',
-    description: 'Boxing weigh-in results for City Knockout have been updated'
-  },
-  {
-    name: 'Isabella Nguyen',
-    email: 'isabella.nguyen@email.com',
-    avatar: 'https://api.slingacademy.com/public/sample-users/3.png',
-    fallback: 'IN',
-    date: '21/02/2025',
-    description: 'new athlete Isabella registered'
-  },
-  {
-    name: 'William Kim',
-    email: 'will@email.com',
-    avatar: 'https://api.slingacademy.com/public/sample-users/4.png',
-    fallback: 'WK',
-    date: '21/02/2025',
-    description: 'william healthstatus updated to injured'
-  },
-  {
-    name: 'Sofia Davis',
-    email: 'sofia.davis@email.com',
-    avatar: 'https://api.slingacademy.com/public/sample-users/5.png',
-    fallback: 'SD',
-    date: '21/02/2025',
-    description: 'new athlete sofia registered'
-  }
-];
+type ActivityItem = {
+  id: string;
+  title: string;
+  description: string;
+  date: string;
+  dateTs: number;
+  avatarUrl?: string;
+  fallback: string;
+};
 
-export function RecentAthletes() {
+function getInitials(first: string, last: string) {
+  return (
+    `${(first || '').charAt(0)}${(last || '').charAt(0)}`.toUpperCase() || 'NA'
+  );
+}
+
+function formatDate(date: string | Date) {
+  const d = new Date(date);
+  return d.toLocaleDateString();
+}
+
+export default async function RecentAthletes() {
+  // Fetch recent athletes and performances
+  const [athletesPage, performancesPage] = await Promise.all([
+    athleteService.getAllAthletes({ page: '1', limit: '10' }),
+    performanceService.getAllPerformances({ page: '1', limit: '10' })
+  ]);
+
+  const athleteItems: ActivityItem[] = (athletesPage.data || []).map(
+    (a: any) => ({
+      id: `ath-${a.athleteId}`,
+      title: `${a.firstName} ${a.lastName}`,
+      description: 'New athlete registered',
+      date: formatDate(a.createdAt || new Date()),
+      dateTs: new Date(a.createdAt || Date.now()).getTime(),
+      avatarUrl: a.avatarUrl,
+      fallback: getInitials(a.firstName, a.lastName)
+    })
+  );
+
+  const perfItems: ActivityItem[] = (performancesPage.data || []).map(
+    (p: any) => {
+      const first = p?.athlete?.firstName || 'Unknown';
+      const last = p?.athlete?.lastName || '';
+      const discipline =
+        p?.discipline?.name ||
+        (p?.event?.sport?.isTeamSport ? p?.event?.sport?.name : 'Performance');
+      const eventName = p?.event?.name || '';
+      const dateStr = p?.date || p?.createdAt || new Date().toISOString();
+      return {
+        id: `perf-${p.performanceId || crypto.randomUUID()}`,
+        title: `${first} ${last}`,
+        description: `${discipline}${eventName ? ` • ${eventName}` : ''} recorded`,
+        date: formatDate(dateStr),
+        dateTs: new Date(dateStr).getTime(),
+        avatarUrl: undefined,
+        fallback: getInitials(first, last)
+      } as ActivityItem;
+    }
+  );
+
+  const items = [...athleteItems, ...perfItems]
+    .sort((a, b) => b.dateTs - a.dateTs)
+    .slice(0, 5);
+
   return (
     <Card className='h-full'>
       <CardHeader>
         <CardTitle>Recent Activity</CardTitle>
-        <CardDescription>15 activities this month.</CardDescription>
+        <CardDescription>{items.length} activities</CardDescription>
       </CardHeader>
       <CardContent>
         <div className='space-y-8'>
-          {athletesData.map((athlete, index) => (
-            <div key={index} className='flex items-center'>
+          {items.map((item) => (
+            <div key={item.id} className='flex items-center'>
               <Avatar className='h-9 w-9'>
-                <AvatarImage src={athlete.avatar} alt='Avatar' />
-                <AvatarFallback>{athlete.fallback}</AvatarFallback>
+                {item.avatarUrl ? (
+                  <AvatarImage src={item.avatarUrl} alt='Avatar' />
+                ) : (
+                  <AvatarFallback>{item.fallback}</AvatarFallback>
+                )}
               </Avatar>
               <div className='ml-4 space-y-1'>
-                <p className='text-sm leading-none font-medium'>
-                  {athlete.name}
-                </p>
+                <p className='text-sm leading-none font-medium'>{item.title}</p>
                 <p className='text-sm leading-none font-bold'>
-                  {athlete.description}
+                  {item.description}
                 </p>
-                <p className='text-muted-foreground text-sm'>{athlete.email}</p>
               </div>
-              <div className='ml-auto font-medium'>{athlete.date}</div>
+              <div className='ml-auto font-medium'>{item.date}</div>
             </div>
           ))}
         </div>

@@ -12,9 +12,10 @@ import { Athlete } from '@/constants/data';
 
 import { IconEdit, IconDotsVertical, IconTrash } from '@tabler/icons-react';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { athleteService } from '../../service/athlete.service';
+import { AthleteDialog, type AthleteFormData } from '../athlete-dialog';
 
 interface CellActionProps {
   data: Athlete;
@@ -23,6 +24,7 @@ interface CellActionProps {
 export const CellAction: React.FC<CellActionProps> = ({ data }) => {
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
   const router = useRouter();
 
   const onConfirm = async () => {
@@ -52,9 +54,40 @@ export const CellAction: React.FC<CellActionProps> = ({ data }) => {
     }
   };
 
+  const deriveSportType = (): AthleteFormData['sportType'] => {
+    const teamSport = data.team?.sport?.name as any;
+    if (teamSport) return teamSport;
+    const firstDisciplineSport = data.disciplines?.[0]?.discipline?.sport
+      ?.name as any;
+    return firstDisciplineSport || 'ATHLETICS';
+  };
+
+  const editingAthlete: AthleteFormData = useMemo(
+    () => ({
+      athleteId: data.athleteId,
+      code: data.code,
+      firstName: data.firstName,
+      lastName: data.lastName,
+      dateOfBirth: data.dateOfBirth,
+      nationality: data.nationality,
+      gender: data.gender,
+      height: data.height,
+      weight: data.weight,
+      bio: data.bio,
+      isActive: data.isActive,
+      sportType: deriveSportType(),
+      teamCode: data.teamCode,
+      positionCode: data.position?.code,
+      disciplines: data.disciplines?.map((d) => ({
+        code: d.discipline?.code || '',
+        currentRank: d.currentRank
+      }))
+    }),
+    [data]
+  );
+
   const handleEdit = () => {
-    // Navigate to athlete profile page for editing
-    router.push(`/dashboard/profile/${data.athleteId}`);
+    setEditOpen(true);
   };
 
   return (
@@ -64,6 +97,19 @@ export const CellAction: React.FC<CellActionProps> = ({ data }) => {
         onClose={() => setOpen(false)}
         onConfirm={onConfirm}
         loading={loading}
+      />
+      <AthleteDialog
+        athlete={editingAthlete}
+        isOpen={editOpen}
+        onClose={() => setEditOpen(false)}
+        onSave={() => {
+          setEditOpen(false);
+          router.refresh();
+        }}
+        onDelete={() => {
+          setEditOpen(false);
+          router.refresh();
+        }}
       />
       <DropdownMenu modal={false}>
         <DropdownMenuTrigger asChild>

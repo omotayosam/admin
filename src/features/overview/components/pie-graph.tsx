@@ -18,55 +18,103 @@ import {
   ChartTooltip,
   ChartTooltipContent
 } from '@/components/ui/chart';
+import { athleteService } from '@/features/athletes/service/athlete.service';
 
-const chartData = [
-  { browser: 'boxing', athletes: 275, fill: 'var(--primary)' },
-  { browser: 'basketball', athletes: 200, fill: 'var(--primary-light)' },
-  { browser: 'football', athletes: 287, fill: 'var(--primary-lighter)' },
-  { browser: 'athletics', athletes: 173, fill: 'var(--primary-dark)' },
-  { browser: 'other', athletes: 190, fill: 'var(--primary-darker)' }
-];
+type SportKey =
+  | 'boxing'
+  | 'basketball'
+  | 'football'
+  | 'athletics'
+  | 'wrestling';
+type SportTypeApi =
+  | 'BOXING'
+  | 'BASKETBALL'
+  | 'FOOTBALL'
+  | 'ATHLETICS'
+  | 'WRESTLING';
+
+const sportKeyToApi: Record<SportKey, SportTypeApi> = {
+  boxing: 'BOXING',
+  basketball: 'BASKETBALL',
+  football: 'FOOTBALL',
+  athletics: 'ATHLETICS',
+  wrestling: 'WRESTLING'
+};
+
+const initialChartData: { sport: SportKey; athletes: number; fill: string }[] =
+  [
+    { sport: 'boxing', athletes: 0, fill: 'var(--primary)' },
+    { sport: 'basketball', athletes: 0, fill: 'var(--primary-light)' },
+    { sport: 'football', athletes: 0, fill: 'var(--primary-lighter)' },
+    { sport: 'athletics', athletes: 0, fill: 'var(--primary-dark)' },
+    { sport: 'wrestling', athletes: 0, fill: 'var(--primary-darker)' }
+  ];
 
 const chartConfig = {
   athletes: {
     label: 'Athletes'
   },
-  boxing: {
-    label: 'Boxing',
-    color: 'var(--primary)'
-  },
-  basketball: {
-    label: 'Basketball',
-    color: 'var(--primary)'
-  },
-  football: {
-    label: 'Football',
-    color: 'var(--primary)'
-  },
-  athletics: {
-    label: 'Athletics',
-    color: 'var(--primary)'
-  },
-  other: {
-    label: 'Other',
-    color: 'var(--primary)'
-  }
+  boxing: { label: 'Boxing', color: 'var(--primary)' },
+  basketball: { label: 'Basketball', color: 'var(--primary)' },
+  football: { label: 'Football', color: 'var(--primary)' },
+  athletics: { label: 'Athletics', color: 'var(--primary)' },
+  wrestling: { label: 'Wrestling', color: 'var(--primary)' }
 } satisfies ChartConfig;
 
 export function PieGraph() {
+  const [chartData, setChartData] = React.useState(initialChartData);
   const totalAthletes = React.useMemo(() => {
     return chartData.reduce((acc, curr) => acc + curr.athletes, 0);
+  }, [chartData]);
+
+  React.useEffect(() => {
+    const fetchCounts = async () => {
+      try {
+        const sportKeys: SportKey[] = [
+          'boxing',
+          'basketball',
+          'football',
+          'athletics',
+          'wrestling'
+        ];
+        const results = await Promise.all(
+          sportKeys.map(async (key) => {
+            const res = await athleteService.getAllAthletes({
+              sportType: sportKeyToApi[key],
+              page: '1',
+              limit: '1'
+            });
+            // Prefer total if present, else fall back to returned data length
+            const total =
+              (res as any)?.total ??
+              (Array.isArray(res?.data) ? res.data.length : 0);
+            return { key, total } as { key: SportKey; total: number };
+          })
+        );
+
+        setChartData((prev) =>
+          prev.map((item) => {
+            const found = results.find((r) => r.key === item.sport);
+            return found ? { ...item, athletes: found.total } : item;
+          })
+        );
+      } catch (e) {
+        // Keep zeros on failure
+        console.error('Failed to load athlete counts by sport', e);
+      }
+    };
+    fetchCounts();
   }, []);
 
   return (
     <Card className='@container/card'>
       <CardHeader>
-        <CardTitle>Pie Chart - Donut with Text</CardTitle>
+        <CardTitle>Athletes by Sport</CardTitle>
         <CardDescription>
           <span className='hidden @[540px]/card:block'>
-            Total athletes by browser for the last 6 months
+            Distribution of athletes across sports
           </span>
-          <span className='@[540px]/card:hidden'>Browser distribution</span>
+          <span className='@[540px]/card:hidden'>Sports distribution</span>
         </CardDescription>
       </CardHeader>
       <CardContent className='px-2 pt-4 sm:px-6 sm:pt-6'>
@@ -76,29 +124,33 @@ export function PieGraph() {
         >
           <PieChart>
             <defs>
-              {['boxing', 'basketball', 'football', 'athletics', 'other'].map(
-                (browser, index) => (
-                  <linearGradient
-                    key={browser}
-                    id={`fill${browser}`}
-                    x1='0'
-                    y1='0'
-                    x2='0'
-                    y2='1'
-                  >
-                    <stop
-                      offset='0%'
-                      stopColor='var(--primary)'
-                      stopOpacity={1 - index * 0.15}
-                    />
-                    <stop
-                      offset='100%'
-                      stopColor='var(--primary)'
-                      stopOpacity={0.8 - index * 0.15}
-                    />
-                  </linearGradient>
-                )
-              )}
+              {[
+                'boxing',
+                'basketball',
+                'football',
+                'athletics',
+                'wrestling'
+              ].map((sport, index) => (
+                <linearGradient
+                  key={sport}
+                  id={`fill${sport}`}
+                  x1='0'
+                  y1='0'
+                  x2='0'
+                  y2='1'
+                >
+                  <stop
+                    offset='0%'
+                    stopColor='var(--primary)'
+                    stopOpacity={1 - index * 0.15}
+                  />
+                  <stop
+                    offset='100%'
+                    stopColor='var(--primary)'
+                    stopOpacity={0.8 - index * 0.15}
+                  />
+                </linearGradient>
+              ))}
             </defs>
             <ChartTooltip
               cursor={false}
@@ -107,10 +159,10 @@ export function PieGraph() {
             <Pie
               data={chartData.map((item) => ({
                 ...item,
-                fill: `url(#fill${item.browser})`
+                fill: `url(#fill${item.sport})`
               }))}
               dataKey='athletes'
-              nameKey='browser'
+              nameKey='sport'
               innerRadius={60}
               strokeWidth={2}
               stroke='var(--background)'
@@ -149,13 +201,30 @@ export function PieGraph() {
         </ChartContainer>
       </CardContent>
       <CardFooter className='flex-col gap-2 text-sm'>
-        <div className='flex items-center gap-2 leading-none font-medium'>
-          boxing leads with{' '}
-          {((chartData[0].athletes / totalAthletes) * 100).toFixed(1)}%{' '}
-          <IconTrendingUp className='h-4 w-4' />
-        </div>
+        {totalAthletes > 0 && (
+          <div className='flex items-center gap-2 leading-none font-medium'>
+            {(() => {
+              const byPercent = chartData
+                .map((d) => ({
+                  key: d.sport,
+                  pct: (d.athletes / totalAthletes) * 100
+                }))
+                .sort((a, b) => b.pct - a.pct);
+              const top = byPercent[0];
+              const labelMap: Record<SportKey, string> = {
+                boxing: 'Boxing',
+                basketball: 'Basketball',
+                football: 'Football',
+                athletics: 'Athletics',
+                wrestling: 'Wrestling'
+              };
+              return `${labelMap[top.key]} leads with ${top.pct.toFixed(1)}%`;
+            })()}{' '}
+            <IconTrendingUp className='h-4 w-4' />
+          </div>
+        )}
         <div className='text-muted-foreground leading-none'>
-          Based on data from January - June 2024
+          Live counts by sport from the athletes database
         </div>
       </CardFooter>
     </Card>

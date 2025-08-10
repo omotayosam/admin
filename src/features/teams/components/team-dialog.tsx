@@ -29,7 +29,7 @@ import {
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -65,6 +65,28 @@ const sports = [
   { id: 5, name: 'Boxing', value: '5' }
 ];
 
+function sportIdToPrefix(sportId?: string): string {
+  switch (sportId) {
+    case '1':
+      return 'BB';
+    case '2':
+      return 'FB';
+    case '3':
+      return 'ATH';
+    case '4':
+      return 'WR';
+    case '5':
+      return 'BX';
+    default:
+      return 'TM';
+  }
+}
+
+function generateTeamCode(prefix: string = 'TM'): string {
+  const random = Math.floor(10000 + Math.random() * 90000); // 5 digits
+  return `${prefix}${random}`;
+}
+
 export function TeamDialog({
   team,
   isOpen,
@@ -83,6 +105,19 @@ export function TeamDialog({
       sportId: team?.sportId || ''
     }
   });
+
+  const sportId = form.watch('sportId');
+
+  // Prefill random code for new teams when dialog opens or when sport changes and code empty
+  useEffect(() => {
+    if (!team && isOpen) {
+      const currentCode = form.getValues('code');
+      if (!currentCode || currentCode.length < 2) {
+        form.setValue('code', generateTeamCode(sportIdToPrefix(sportId)));
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, sportId, team]);
 
   const onSubmit = async (data: TeamFormData) => {
     setIsLoading(true);
@@ -135,7 +170,23 @@ export function TeamDialog({
                   <FormItem>
                     <FormLabel>Team Code</FormLabel>
                     <FormControl>
-                      <Input placeholder='TEAM001' {...field} />
+                      <div className='flex gap-2'>
+                        <Input placeholder='TEAM001' {...field} />
+                        <Button
+                          type='button'
+                          variant='outline'
+                          onClick={() =>
+                            form.setValue(
+                              'code',
+                              generateTeamCode(
+                                sportIdToPrefix(form.getValues('sportId'))
+                              )
+                            )
+                          }
+                        >
+                          Randomize
+                        </Button>
+                      </div>
                     </FormControl>
                     <FormDescription>
                       Unique identifier for the team

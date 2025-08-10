@@ -14,12 +14,17 @@ const baseConfig: NextConfig = {
   },
   transpilePackages: ['geist'],
   async rewrites() {
-    return [
-      {
-        source: '/api/:path*',
-        destination: 'http://localhost:1440/api/:path*',
-      },
-    ];
+    // Only proxy to local API in development when NEXT_PUBLIC_API_URL is not set
+    if (process.env.NODE_ENV === 'development' && !process.env.NEXT_PUBLIC_API_URL) {
+      return [
+        {
+          source: '/api/:path*',
+          destination: 'http://localhost:1440/api/:path*',
+        },
+      ];
+    }
+    // In production, let the client hit NEXT_PUBLIC_API_URL directly
+    return [];
   },
 };
 

@@ -11,6 +11,26 @@ import { ArrowLeft, Trophy, Calendar, Target } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import apiClient from '@/lib/api-client';
 import SimpleLayout from '../../simple-layout';
+import { performanceService } from '@/features/performances/service/performance.service';
+
+interface Team {
+  teamId: number;
+  code: string;
+  name: string;
+  sportId: number;
+  createdAt: string;
+  updatedAt: string;
+  sport?: any;
+}
+
+interface Position {
+  positionId: number;
+  name: string;
+  code: string;
+  sportId: number;
+  description?: string;
+  sport?: any;
+}
 
 interface Athlete {
   athleteId: number;
@@ -26,8 +46,8 @@ interface Athlete {
   isActive: boolean;
   teamCode?: string;
   positionId?: number;
-  team?: string;
-  position?: string;
+  team?: string | Team; // Can be either string or Team object
+  position?: string | Position; // Can be either string or Position object
   avatarUrl?: string;
   disciplines?: Array<{
     id: number;
@@ -82,15 +102,79 @@ export default function AthleteDetailsPage() {
     }
   };
 
+  const formatResult = (p: any): string => {
+    if (p?.time != null) return `${p.time}s`;
+    if (p?.distance != null) return `${p.distance}m`;
+    if (p?.height != null) return `${p.height}m`;
+    if (p?.points != null) return `${p.points} pts`;
+
+    // Basketball summary
+    if (
+      [
+        'twoPoints',
+        'threePoints',
+        'freeThrows',
+        'rebounds',
+        'assists',
+        'steals',
+        'blocks'
+      ].some((k) => p?.[k] != null)
+    ) {
+      const parts: string[] = [];
+      if (p.points != null) parts.push(`${p.points} PTS`);
+      if (p.rebounds != null) parts.push(`${p.rebounds} REB`);
+      if (p.assists != null) parts.push(`${p.assists} AST`);
+      return parts.join(' · ') || '—';
+    }
+
+    // Football summary
+    if (
+      [
+        'goalsScored',
+        'assists',
+        'minutesPlayed',
+        'yellowCards',
+        'redCards'
+      ].some((k) => p?.[k] != null)
+    ) {
+      const parts: string[] = [];
+      if (p.goalsScored != null) parts.push(`${p.goalsScored} G`);
+      if (p.assists != null) parts.push(`${p.assists} A`);
+      if (p.minutesPlayed != null) parts.push(`${p.minutesPlayed}'`);
+      return parts.join(' · ') || '—';
+    }
+    return '—';
+  };
+
   const fetchAthletePerformances = async (athleteId: string) => {
     try {
       setPerformancesLoading(true);
-      const response = await apiClient.get(
-        `/performances/athlete/${athleteId}`
+      const list = await performanceService.getPerformancesByAthlete(
+        Number(athleteId)
       );
-      setPerformances(response.data);
+
+      const items = (list || []).map((p: any) => {
+        const eventName = p?.event?.name ?? 'Unknown Event';
+        const disciplineName =
+          p?.discipline?.name ??
+          (p?.event?.sport?.isTeamSport ? p?.event?.sport?.name : '—');
+        const venueName = p?.event?.venue?.name ?? undefined;
+        return {
+          id: String(p.performanceId ?? p.id ?? Math.random()),
+          eventName,
+          discipline: disciplineName,
+          result: formatResult(p),
+          date: p?.date ?? p?.event?.startDate ?? new Date().toISOString(),
+          venue: venueName,
+          rank: p?.position ?? undefined,
+          isPersonalBest: p?.isPersonalBest ?? false
+        } as Performance;
+      });
+
+      setPerformances(items);
     } catch (error) {
       console.error('Error fetching athlete performances:', error);
+      setPerformances([]);
     } finally {
       setPerformancesLoading(false);
     }
@@ -116,6 +200,24 @@ export default function AthleteDetailsPage() {
       age--;
     }
     return age;
+  };
+
+  // Helper function to get team name safely
+  const getTeamName = (team: string | Team | undefined): string | null => {
+    if (!team) return null;
+    if (typeof team === 'string') return team;
+    if (typeof team === 'object' && team.name) return team.name;
+    return null;
+  };
+
+  // Helper function to get position name safely
+  const getPositionName = (
+    position: string | Position | undefined
+  ): string | null => {
+    if (!position) return null;
+    if (typeof position === 'string') return position;
+    if (typeof position === 'object' && position.name) return position.name;
+    return null;
   };
 
   if (loading) {
@@ -180,6 +282,9 @@ export default function AthleteDetailsPage() {
     );
   }
 
+  const teamName = getTeamName(athlete.team);
+  const positionName = getPositionName(athlete.position);
+
   return (
     <SimpleLayout>
       <div className='container mx-auto p-6'>
@@ -232,18 +337,16 @@ export default function AthleteDetailsPage() {
                   <span className='text-sm text-gray-600'>Nationality:</span>
                   <Badge variant='secondary'>{athlete.nationality}</Badge>
                 </div>
-                {athlete.team && (
+                {teamName && (
                   <div className='flex items-center justify-between'>
                     <span className='text-sm text-gray-600'>Team:</span>
-                    <span className='text-sm font-medium'>{athlete.team}</span>
+                    <span className='text-sm font-medium'>{teamName}</span>
                   </div>
                 )}
-                {athlete.position && (
+                {positionName && (
                   <div className='flex items-center justify-between'>
                     <span className='text-sm text-gray-600'>Position:</span>
-                    <span className='text-sm font-medium'>
-                      {athlete.position}
-                    </span>
+                    <span className='text-sm font-medium'>{positionName}</span>
                   </div>
                 )}
                 <div className='flex items-center justify-between'>

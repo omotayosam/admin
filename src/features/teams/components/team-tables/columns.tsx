@@ -46,8 +46,10 @@ export const columns: ColumnDef<Team>[] = [
     ),
     cell: ({ row }) => {
       const sportId = row.getValue('sportId') as number;
-      const sportName =
-        SPORT_MAP[sportId.toString() as keyof typeof SPORT_MAP] || 'Unknown';
+      const byId =
+        SPORT_MAP[(sportId ?? '').toString() as keyof typeof SPORT_MAP];
+      const fallback = (row.original as any).sport?.name as string | undefined;
+      const sportName = byId || fallback || 'Unknown';
       return (
         <Badge variant='secondary' className='capitalize'>
           {sportName}

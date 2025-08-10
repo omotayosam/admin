@@ -59,15 +59,58 @@ function getPrimaryRank(athlete: Athlete): number | null {
   return primaryDiscipline.currentRank || null;
 }
 
+function mapDisciplineToSportType(
+  code?: string
+):
+  | 'BASKETBALL'
+  | 'FOOTBALL'
+  | 'ATHLETICS'
+  | 'WRESTLING'
+  | 'BOXING'
+  | 'Unknown' {
+  if (!code) return 'Unknown';
+  const athletics = new Set([
+    '100M',
+    '200M',
+    '400M',
+    '800M',
+    '1500M',
+    '110H',
+    'LJ',
+    'HJ',
+    'SP',
+    'JAV'
+  ]);
+  const wrestling = new Set([
+    '57KG_FS',
+    '61KG_FS',
+    '65KG_FS',
+    '70KG_FS',
+    '74KG_FS'
+  ]);
+  const boxing = new Set(['FLY', 'BAN', 'FEA', 'LIG', 'WEL']);
+  if (athletics.has(code)) return 'ATHLETICS';
+  if (wrestling.has(code)) return 'WRESTLING';
+  if (boxing.has(code)) return 'BOXING';
+  return 'Unknown';
+}
+
 // Helper function to get sport type from disciplines or team
 function getSportType(athlete: Athlete): string {
   if (athlete.disciplines && athlete.disciplines.length > 0) {
-    const sportName = athlete.disciplines[0].discipline?.sport?.name;
+    const code = athlete.disciplines[0].discipline?.code;
+    const mapped = mapDisciplineToSportType(code);
+    if (mapped !== 'Unknown') return mapped;
+    const sportName = athlete.disciplines[0].discipline?.sport?.name as any;
     return sportName || 'Unknown';
   }
   if (athlete.team) {
-    const sportName = athlete.team.sport?.name;
-    return sportName || 'Unknown';
+    const sportName = (athlete.team as any).sport?.name as any;
+    if (sportName) return sportName;
+  }
+  if (athlete.position) {
+    const sportName = (athlete.position as any).sport?.name as any;
+    if (sportName) return sportName;
   }
   return 'Unknown';
 }

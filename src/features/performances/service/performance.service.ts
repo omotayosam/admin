@@ -176,7 +176,8 @@ class PerformanceService {
     async getPerformancesByAthlete(athleteId: number, params?: any): Promise<Performance[]> {
         try {
             const response = await apiClient.get(`/performances/athlete/${athleteId}`, { params });
-            return response.data;
+            //return response.data;
+            return response.data?.data || [];
         } catch (error) {
             const axiosError = error as AxiosError;
             console.error('Error in performanceService.getPerformancesByAthlete:', axiosError);
