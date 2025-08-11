@@ -7,6 +7,7 @@ import SearchInput from '../search-input';
 import { ThemeSelector } from '../theme-selector';
 import { ModeToggle } from './ThemeToggle/theme-toggle';
 import CtaGithub from './cta-github';
+import { UserNav } from './user-nav';
 
 export default function Header() {
   return (
@@ -25,6 +26,7 @@ export default function Header() {
 
         <ModeToggle />
         <ThemeSelector />
+        <UserNav />
       </div>
     </header>
   );
