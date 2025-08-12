@@ -55,10 +55,18 @@ export const columns: ColumnDef<EventItem>[] = [
     ),
     cell: ({ row }) => {
       const start = row.original.startDate
-        ? new Date(row.original.startDate).toLocaleDateString()
+        ? new Date(row.original.startDate).toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit'
+          })
         : '—';
       const end = row.original.endDate
-        ? new Date(row.original.endDate).toLocaleDateString()
+        ? new Date(row.original.endDate).toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit'
+          })
         : '';
       return <div>{end ? `${start} - ${end}` : start}</div>;
     }
