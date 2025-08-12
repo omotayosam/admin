@@ -99,9 +99,11 @@ export default function AthletesPage() {
 
   return (
     <SimpleLayout>
-      <div className='container mx-auto p-6'>
-        <div className='mb-6 flex items-center justify-between'>
-          <h1 className='text-3xl font-bold'>Athletes</h1>
+      <div className='flex flex-1 flex-col space-y-2'>
+        <div className='flex items-center justify-between space-y-2'>
+          <h2 className='text-2xl font-bold tracking-tight'>
+            Hi, Welcome back 👋
+          </h2>
           <div className='relative'>
             <Search className='absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 transform text-gray-400' />
             <Input
@@ -135,7 +137,7 @@ export default function AthletesPage() {
                   </div>
                 </div>
               </CardHeader>
-              <CardContent>
+              <CardContent className='px-2 pt-4 sm:px-6 sm:pt-6'>
                 <div className='space-y-2'>
                   <div className='flex justify-between'>
                     <span className='text-sm text-gray-600'>Nationality:</span>

@@ -131,16 +131,15 @@ export default function PerformancesPage() {
   if (loading) {
     return (
       <SimpleLayout>
-        <div className='container mx-auto p-6'>
-          <div className='mb-6 flex items-center justify-between'>
-            <h1 className='text-3xl font-bold'>Performances</h1>
-            <Skeleton className='h-10 w-64' />
+        <div className='flex flex-1 flex-col space-y-2'>
+          <div className='flex items-center justify-between space-y-2'>
+            <h2 className='text-2xl font-bold tracking-tight'>Performances</h2>
           </div>
-          <div className='space-y-4'>
+          <div className='grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-7'>
             {[...Array(5)].map((_, i) => (
-              <Card key={i}>
-                <CardContent className='p-6'>
-                  <div className='flex items-center justify-between'>
+              <Card className='meeee @container/card !pt-3' key={i}>
+                <CardContent className='px-2 pt-4 sm:px-6 sm:pt-6'>
+                  <div className='mx-auto flex aspect-square h-[250px] items-center justify-between'>
                     <div className='flex items-center space-x-4'>
                       <Skeleton className='h-12 w-12 rounded-full' />
                       <div className='space-y-2'>
@@ -161,8 +160,8 @@ export default function PerformancesPage() {
 
   return (
     <SimpleLayout>
-      <div className='container mx-auto p-6'>
-        <div className='mb-6 flex items-center justify-between'>
+      <div className='flex flex-1 flex-col space-y-2'>
+        <div className='flex items-center justify-between space-y-2'>
           <h1 className='text-3xl font-bold'>Performances</h1>
           <div className='relative'>
             <Search className='absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 transform text-gray-400' />
@@ -186,13 +185,10 @@ export default function PerformancesPage() {
             </p>
           </div>
         ) : (
-          <div className='space-y-4'>
+          <div className='grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3'>
             {performances.map((performance) => (
-              <Card
-                key={performance.id}
-                className='transition-shadow hover:shadow-lg'
-              >
-                <CardContent className='p-6'>
+              <Card key={performance.id} className='container/card !pt-3'>
+                <CardContent className='px-2 pt-4 sm:px-6 sm:pt-6'>
                   <div className='flex items-center justify-between'>
                     <div className='flex items-center space-x-4'>
                       <div className='flex flex-col items-center rounded-full bg-blue-100 p-2'>
